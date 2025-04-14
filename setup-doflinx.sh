@@ -1,16 +1,17 @@
 #!/bin/bash
+# Run this script with this command
+# wget https://raw.githubusercontent.com/DOFLinx/DOFLinx-for-Linux/refs/heads/main/setup-doflinx.sh && chmod +x setup-doflinx.sh && ./setup-doflinx.sh
 version=1
 install_successful=true
 mame=true
+batocera_40_plus_version=40
+
 NEWLINE=$'\n'
 cyan='\033[0;36m'
 red='\033[0;31m'
 yellow='\033[0;33m'
 green='\033[0;32m'
 nc='\033[0m'
-
-# Run this script with this command
-# wget https://raw.githubusercontent.com/DOFLinx/DOFLinx-for-Linux/refs/heads/main/setup-doflinx.sh && chmod +x setup-doflinx.sh && ./setup-doflinx.sh
 
 function pause(){
  read -s -n 1 -p "Press any key to continue . . ."
@@ -180,6 +181,24 @@ sed -i -e "s|/home/arcade/|${INSTALLPATH}|g" ${INSTALLPATH}/doflinx/config/DOFLi
 if [ $? -ne 0 ]; then
    echo -e "${red}[ERROR] Failed to edit DOFLinx.ini"
    install_successful=false
+fi
+
+# checking if we have a Batocera installation and if so, we'll add doflinx to Batocera services
+if batocera-info | grep -q 'System'; then
+   echo "Batocera Detected"
+   batocera_version="$(batocera-es-swissknife --version | cut -c1-2)" #get the version of Batocera as only Batocera V40 and above support services
+   if [[ $batocera_version -ge $batocera_40_plus_version ]]; then #we need to add the service file and enable in services
+      if [[ ! -d ${INSTALLPATH}services ]]; then #does the ES scripts folder exist, make it if not
+         mkdir ${INSTALLPATH}services
+      fi
+      wget -O ${INSTALLPATH}services/doflinx https://raw.githubusercontent.com/DOFLinx/DOFLinx-for-Linux/main/batocera/doflinx
+      chmod +x ${INSTALLPATH}services/doflinx
+      sleep 1
+      batocera-services enable doflinx 
+      echo "[INFO] DOFLinx added to Batocera services for Batocera V40 and up"
+   fi #TODO add support for Batocera V39 and below and modify custom.sh
+else
+  echo -e "${yellow}[ERROR]${nc} Not on Batocera, skipping Batocera service setup..."
 fi
 
 echo -e "${green}[INFO]${nc} Cleaning up"
