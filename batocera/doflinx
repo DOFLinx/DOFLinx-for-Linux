@@ -8,6 +8,7 @@ case "$1" in
         ;;
     stop)
         # Code in here will only be executed on shutdown.
+        cd /userdata/system/doflinx && ./DOFLinxMsg QUIT
         ;;
     restart|reload)
         # Code in here will executed (when?).
