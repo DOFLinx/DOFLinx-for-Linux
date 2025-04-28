@@ -2,9 +2,8 @@
 # Run this script with this command
 # wget https://raw.githubusercontent.com/DOFLinx/DOFLinx-for-Linux/refs/heads/main/setup-doflinx.sh && chmod +x setup-doflinx.sh && ./setup-doflinx.sh  TODO delete these lines later
 # wget https://raw.githubusercontent.com/alinke/DOFLinx-for-Linux/refs/heads/main/setup-doflinx.sh && chmod +x setup-doflinx.sh && ./setup-doflinx.sh
-version=1
+version=2
 install_successful=true
-mame=true
 batocera_40_plus_version=40
 RETROPIE_AUTOSTART_FILE="/opt/retropie/configs/all/autostart.sh"
 RETROPIE_LINE_TO_ADD="cd ~/doflinx && ./DOFLinx -PATH_INI=~/doflinx/config/DOFLinx.ini"
@@ -26,7 +25,6 @@ echo -e "       ${cyan}DOFLinx for Linux : Installer Version $version${nc}    "
 echo -e ""
 echo -e "This script will install the DOFLinx software in $HOME/doflinx"
 echo -e "Plese ensure you have at least 1 GB of free disk space in $HOME"
-echo -e "Use "nomame" on the command line for this script if you do not want the DOFLinx version of Mame installed.  If you do this you will need to install it manually later."
 echo -e ""
 pause
 
@@ -36,11 +34,6 @@ pause
 INSTALLPATH="${HOME}/"
 
 commandLineArg=$1
-
-if [[ "$commandLineArg" == "nomame" ]]; then
-   echo -e "${yellow}[WARNING]${nc} Excluding setting up the DOFLinx version of Mame (due to "nomame" parameter).  Please do this manually later."
-   mame=false
-fi
 
 # If this is an existing installation then DOFLinx could already be running
 if test -f ${INSTALLPATH}doflinx/DOFLinx; then
@@ -53,10 +46,6 @@ fi
 
 if ! test -f ${INSTALLPATH}pixelcade/pixelweb; then
    echo -e "${green}[INFO]${nc} No Pixelcade installation can be seen at ${INSTALLPATH}pixelcade"
-fi
-
-if ! test -f /usr/games/mame; then
-   echo -e "${yellow}[WARNING]${nc} No Mame instllation can be seen at /usr/games"
 fi
 
 # The possible platforms are:
@@ -137,27 +126,6 @@ echo -e "${cyan}[INFO]Installing DOFLinx Software...${nc}"
 
 cd ${INSTALLPATH}doflinx/temp
 
-if [[ $mame == "true" ]]; then
-   mame_url=https://github.com/DOFLinx/DOFLinx-for-Linux/releases/download/mame-${machine_arch}/mame-${machine_arch}.zip
-   wget -O "${INSTALLPATH}doflinx/temp/mame-${machine_arch}.zip" "$mame_url"
-   if [ $? -ne 0 ]; then
-      echo -e "${red}[ERROR]${nc} Failed to download Mame"
-      install_successful=false
-   else
-      unzip mame-${machine_arch}
-      if [ $? -ne 0 ]; then
-         echo -e "${red}[ERROR]${nc} Failed to unzip Mame"
-         install_successful=false
-      else
-         sudo cp -f /usr/games/mame /usr/games/mame_old
-         sudo cp -f ./mame /usr/games/mame
-         if [ $? -ne 0 ]; then
-            echo -e "${red}[ERROR]${nc} Failed to copy Mame executable"
-            install_successful=false
-         fi
-      fi
-   fi
-fi
 doflinx_url=https://github.com/DOFLinx/DOFLinx-for-Linux/releases/download/doflinx/doflinx.zip
 wget -O "${INSTALLPATH}doflinx/temp/doflinx.zip" "$doflinx_url"
 if [ $? -ne 0 ]; then
@@ -174,6 +142,25 @@ else
          echo -e "${red}[ERROR]${nc} Failed to copy DOFLinx files"
          install_successful=false
       fi
+      PLUGIN_PATH=$(find / -name init.lua 2>/dev/null | grep hiscore| xargs dirname | xargs dirname | head -n 1)
+      cp -f -r "${INSTALLPATH}doflinx/DOFLinx Mame Integration/doflinx" ${PLUGIN_PATH}/
+      if [ $? -ne 0 ]; then
+         echo -e "${yellow}[WARNING]${nc} Failed to copy DOFLinx plugin, will attempt via sudo"
+         sudo cp -f -r "${INSTALLPATH}doflinx/DOFLinx Mame Integration/doflinx" ${PLUGIN_PATH}/
+         if [ $? -ne 0 ]; then
+             echo -e "${red}[ERROR]${nc} Failed to copy DOFLinx plugin"
+             install_successful=false
+         fi
+      fi
+      cp -f ${INSTALLPATH}doflinx/DLSocket/${machine_arch}/DLSocket ${PLUGIN_PATH}/doflinx/
+      if [ $? -ne 0 ]; then
+          echo -e "${yellow}[WARNING]${nc} Failed to copy DLSocket to DOFLinx plugin directory, will attempt via sudo"
+          sudo cp -f ${INSTALLPATH}doflinx/DLSocket/${machine_arch}/DLSocket ${PLUGIN_PATH}/doflinx/
+          if [ $? -ne 0 ]; then
+              echo -e "${red}[ERROR]${nc} Failed to copy DLSocket to DOFLinx plugin directory"
+              install_successful=false
+          fi
+      fi
    fi
 fi
 
@@ -188,7 +175,7 @@ fi
 
 # Checking for Batocera installation
 if batocera-info | grep -q 'System'; then
-   echo "Batocera Detected"
+   echo -e "${green}[INFO]${nc}Batocera Detected"
    batocera_version="$(batocera-es-swissknife --version | cut -c1-2)" #get the version of Batocera as only Batocera V40 and above support services
    if [[ $batocera_version -ge $batocera_40_plus_version ]]; then #we need to add the service file and enable in services
       if [[ ! -d ${INSTALLPATH}services ]]; then #does the ES scripts folder exist, make it if not
@@ -198,7 +185,7 @@ if batocera-info | grep -q 'System'; then
       chmod +x ${INSTALLPATH}services/doflinx
       sleep 1
       batocera-services enable doflinx 
-      echo "[INFO] DOFLinx added to Batocera services for Batocera V40 and up"
+      echo -e "${green}[INFO]${nc} DOFLinx added to Batocera services for Batocera V40 and up"
    fi # TODO add support for Batocera V39 and below and modify custom.sh
 else
   echo -e "${yellow}[ERROR]${nc} Not on Batocera, skipping Batocera setup..."
@@ -206,21 +193,21 @@ fi
 
 # Checking for Retropie installation
 if [[ -f "$RETROPIE_AUTOSTART_FILE" ]]; then
-  echo "${yellow}RetroPie Detected...${nc}"
+  echo "${green}[INFO]${nc}RetroPie Detected..."
   if grep -q "DOFLinx" "$RETROPIE_AUTOSTART_FILE"; then
-      echo "DOFLinx entry already exists in $RETROPIE_AUTOSTART_FILE. Skipping."
+      echo-e  "${green}[INFO]${nc}DOFLinx entry already exists in $RETROPIE_AUTOSTART_FILE. Skipping."
   else
-      echo "Adding DOFLinx to $RETROPIE_AUTOSTART_FILE"
+      echo -e "${green}[INFO]${nc}Adding DOFLinx to $RETROPIE_AUTOSTART_FILE"
       if grep -q "pixelweb" "$RETROPIE_AUTOSTART_FILE"; then
           sudo sed -i '/pixelweb/a '"$RETROPIE_LINE_TO_ADD" "$RETROPIE_AUTOSTART_FILE"  # insert DOFLinx after the pixelweb line
       else
           echo "$RETROPIE_LINE_TO_ADD" | sudo tee -a "$RETROPIE_AUTOSTART_FILE" > /dev/null
       fi
-      echo "DOFLinx added to RetroPie autostart"
+      echo -e "${green}[INFO]${nc}DOFLinx added to RetroPie autostart"
   fi
   sudo chmod +x "$RETROPIE_AUTOSTART_FILE"
 else
-  echo "${yellow}Not on RetroPie, skipping RetroPie setup...${white}"
+  echo -e "${green}[INFO]${nc}Not on RetroPie, skipping RetroPie setup..."
 fi
 
 echo -e "${green}[INFO]${nc} Cleaning up"
